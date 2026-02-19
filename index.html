@@ -199,7 +199,7 @@
 
             DrawCellGroupBorders() {
                 const groupHasValidMirror = new Set();
-                for (let i = 0; i < this.CellGroups; i++) {
+                for (let i = 0; i <= this.CellGroups; i++) {
                     const mirror = this.Mirrors.find(x => x.CellGroup === i);
                     if (mirror && mirror.Valid)
                         groupHasValidMirror.add(i);

@@ -17,7 +17,11 @@ class LaserMirrorGrid extends GridBase {
         const instructions = `Draw diagonal lines across certain squares to form mirrors, with exactly one mirror per region outlined in bold.
 The mirrors must be placed so that a laser fired horizontally or vertically into the grid from each lettered clue would then
 exit the grid at the same letter elsewhere, having bounced off the exact number of mirrors indicated by the number next to the letter.
-All mirrors must be reached by at least one laser.`;
+All mirrors must be reached by at least one laser.
+
+<br/><br/>Click a square to place a mirror.
+<br/>Click again to rotate the mirror.
+<br/>Clicking again will remove the mirror.`;
 
         const progressTracks = [
             new ProgressTrack(this.LaserProgress, 'Lasers', 6),
@@ -346,7 +350,6 @@ class LaserEndpoint {
 }
 
 class Mirror {
-    //also would ideally be an Enum
     static TopLeftDownRight = false;
     static TopRightDownLeft = true;
 

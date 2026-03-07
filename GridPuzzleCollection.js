@@ -64,7 +64,7 @@ class GridPuzzleCollection {
         this.#canvasId = canvasId;
         this.#leftX = leftX;
         this.#topY = topY;
-        this.#puzzles = new Map(); //Array.from(puzzles, (v) => [v.Id, v]));
+        this.#puzzles = new Map();
 
         const puzzleList = document.getElementById(puzzleListId);
         puzzleList.addEventListener('click', (e) => {
@@ -98,11 +98,22 @@ class GridPuzzleCollection {
         if (this.#activePuzzle === id)
             return;
 
+        const activeItem = this.#GetPuzzleListItem(this.#activePuzzle);
+        if (activeItem != null)
+            activeItem.classList.remove("active");
+
+        const newItem = this.#GetPuzzleListItem(id);
+        newItem.classList.add("active");
+
         this.#LoadPuzzle(id);
     }
 
     ResetPuzzle() {
         this.#LoadPuzzle(this.#activePuzzle);
+    }
+
+    #GetPuzzleListItem(id) {
+        return document.querySelector(`li[data-id='${id}']`);
     }
 
     #LoadPuzzle(id) {
@@ -115,7 +126,7 @@ class GridPuzzleCollection {
         titleElement.textContent = puzzle.Title;
 
         const instructionsElement = document.getElementById(this.#instructionsId);
-        instructionsElement.textContent = puzzle.Instructions;
+        instructionsElement.innerHTML = puzzle.Instructions;
 
         const progressContainer = document.getElementById(this.#progressContainerId);
         for (const el of progressContainer.querySelectorAll('grid-progress'))

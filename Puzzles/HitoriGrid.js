@@ -10,7 +10,11 @@ class HitoriGrid extends GridBase {
     static GetPuzzle() {
         const instructions = `Shade some squares so that no number epeats in any row or column.
 Shaded squares cannot touch, except diagonally.
-All unshaded squares must form a single connected region.`;
+All unshaded squares must form a single connected region.
+
+<br/><br/>Click a square to shade it.
+<br/>Clicking again will shade it darker (identical function, visual only).
+<br/>Click again to remove shading.`;
 
         const progressTracks = [
             new ProgressTrack(this.RowProgress, 'Rows', 8),
@@ -71,9 +75,11 @@ All unshaded squares must form a single connected region.`;
     DrawGrid() {
         this.#UpdateProgress();
 
-        super.DrawGrid();
-
+        //we don't user super.DrawGrid() but instead call the functions directly because we want to draw the grid lines and cell borders after filling the cells in #DrawCells()
+        this.ClearGrid();
         this.#DrawCells();
+        this.DrawGridLines();
+        this.DrawCellBorders();
     }
 
     //#endregion

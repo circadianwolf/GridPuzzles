@@ -149,8 +149,7 @@ class GridBase {
     //#endregion
 
     DrawGrid() {
-        this.CanvasContext.clearRect(0, 0, this.Canvas.width, this.Canvas.height);
-
+        this.ClearGrid();
         this.DrawGridLines();
         this.DrawCellBorders();
     }
@@ -208,6 +207,10 @@ class GridBase {
     //#endregion
 
     //#region Helpers
+
+    ClearGrid() {
+        this.CanvasContext.clearRect(0, 0, this.Canvas.width, this.Canvas.height);
+    }
 
     DrawGridLine(row1, col1, row2, col2, offset = 0) {
         const x1 = this.LeftX + (col1 * this.CellSize) + offset;

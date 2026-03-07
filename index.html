@@ -3,573 +3,95 @@
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta charset="utf-8" />
-    <title>Lasers</title>
+    <title>Grid Puzzles</title>
     <style>
         body {
             display: flex;
-            flex-direction:column;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
             min-height: 100vh;
+            min-width: 100vw;
             margin: 0;
             background: #f0f0f0;
         }
 
-        #instructions {
+        main {
             width: 450px;
-            padding-bottom: 25px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            margin-left:25px;
+        }
+
+        #instructions {
+            padding-bottom: 15px;
         }
 
         #gridCanvas {
             background: white;
         }
+
+        #progressAndReset {
+            width: 100%;
+            display: flex;
+            justify-content: space-evenly;
+            align-items: center;
+            padding: 0px 50px 15px;
+            box-sizing: border-box;
+        }
+
+        #progress {
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+        }
+
+        #progress > grid-progress {
+            order: -1;
+        }
+
+        #btnReset {
+            height:25px;
+        }
     </style>
 </head>
 <body>
-    <h1>Lasers</h1>
-    <div id="instructions">
-        Draw diagonal lines across certain squares to form mirrors, with exactly one mirror per region outlined in bold. 
-        The mirrors must be placed so that a laser fired horizontally or vertically into the grid from each lettered clue would then 
-        exit the grid at the same letter elsewhere, having bounced off the exact number of mirrors indicated by the number next to the letter. 
-        All mirrors must be reached by at least one laser.
-    </div>
-    <canvas id="gridCanvas" width="450" height="450"></canvas>
+    <nav>
+        <ul id="puzzleList">
+
+        </ul>
+    </nav>
+    <main>
+        <h1 id="puzzleTitle"></h1>
+        <div id="instructions">
+        </div>
+        <h2 id="hSuccess" hidden>Success!</h2>
+        <div id="progressAndReset">
+            <div id="progress">
+
+            </div>
+            <button type="button" id="btnReset">Reset</button>
+        </div>
+        <canvas id="gridCanvas" width="450" height="450"></canvas>
+    </main>
+    <script type="text/javascript" src="IterableWeakMap.js"></script>
+    <script type="text/javascript" src="EventManager.js"></script>
+    <script type="text/javascript" src="GridProgressElement.js"></script>
+    <script type="text/javascript" src="GridBase.js"></script>
+    <script type="text/javascript" src="GridPuzzle.js"></script>
+    <script type="text/javascript" src="GridPuzzleCollection.js"></script>
+    <script type="text/javascript" src="Puzzles/LaserMirrorGrid.js"></script>
+    <script type="text/javascript" src="Puzzles/HitoriGrid.js"></script>
     <script>
-        class Grid {
-            #canvas
-            #canvasContext;
+        customElements.define("grid-progress", GridProgressElement);
 
-            /** @type {Cell[]} */
-            CellsList = [];
-            /** @type {Cell[][]} */
-            CellsGrid = [];
-            get RowCount() {
-                return this.CellsGrid.length;
-            }
-            ColCount = 0;
-            CellGroups = 0;
+        const puzzleCollection = new GridPuzzleCollection("puzzleList", "puzzleTitle", "instructions", "progress", "hSuccess", "btnReset", "gridCanvas", 50, 50, [
+            LaserMirrorGrid.GetPuzzle(),
+            HitoriGrid.GetPuzzle(),
+        ]);
 
-            CanvasId = "";
-            /** @type {HTMLCanvasElement} */
-            get Canvas() {
-                if (!this.#canvas) {
-                    const canvas = document.getElementById(this.CanvasId);
-                    if (!canvas)
-                        throw "Invalid canvas";
-                    this.#canvas = canvas;
-                }
-                return this.#canvas;
-            }
-            /** @type {CanvasRenderingContext2D} */
-            get CanvasContext() {
-                if (!this.#canvasContext) {
-                    this.#canvasContext = this.Canvas.getContext('2d');
-                }
-                return this.#canvasContext;
-            }
-
-            LeftX = 0;
-            TopY = 0;
-            CellSize = 50;
-            get RightX() {
-                return this.LeftX + (this.CellSize * this.ColCount);
-            }
-            get BottomY() {
-                return this.TopY + (this.CellSize * this.RowCount);
-            }
-
-            /** @type {Laser[]} */
-            Lasers = [];
-            /** @type {Mirror[]} */
-            Mirrors = [];
-
-            constructor(canvasId, leftX, topY, cellGroups, lasers) {
-                this.CanvasId = canvasId;
-                this.LeftX = leftX;
-                this.TopY = topY;
-                this.Lasers = lasers;
-
-                this.LoadCells(cellGroups);
-                this.LoadCellBorders();
-
-                this.Canvas.addEventListener('click', (e) => { this.CanvasClick(e); });
-            }
-
-            LoadCells(cellGroups) {
-                const numRows = cellGroups.length;
-                const numCols = cellGroups[0].length;
-                if (cellGroups.some(row => row.length !== numCols))
-                    throw "All rows must have equal number of cells";
-
-                this.ColCount = numCols;
-
-                for (let rowIdx = 0; rowIdx < numRows; rowIdx++) {
-                    const row = [];
-                    this.CellsGrid[rowIdx] = row;
-
-                    for (let colIdx = 0; colIdx < numCols; colIdx++) {
-                        const cellGroup = cellGroups[rowIdx][colIdx];
-
-                        const cell = new Cell(rowIdx, colIdx, cellGroup);
-
-                        if (cellGroup > this.CellGroups)
-                            this.CellGroups = cellGroup;
-
-                        this.CellsList.push(cell);
-                        row[colIdx] = cell;
-                    }
-                }
-            }
-
-            LoadCellBorders() {
-                for (let rowIdx = 0; rowIdx < this.RowCount; rowIdx++) {
-                    for (let colIdx = 0; colIdx < this.ColCount; colIdx++) {
-                        const cell = this.CellsGrid[rowIdx][colIdx];
-
-                        if (rowIdx === 0)
-                            cell.Borders.AddBorder(CellBorders.Top);
-                        else if (rowIdx === this.RowCount - 1)
-                            cell.Borders.AddBorder(CellBorders.Bottom);
-
-                        if (colIdx === 0)
-                            cell.Borders.AddBorder(CellBorders.Left);
-                        else if (colIdx === this.ColCount - 1)
-                            cell.Borders.AddBorder(CellBorders.Right);
-
-                        //we only need to handle one of (top/bottom) and (left/right) each
-                        if (rowIdx > 0 && this.CellsGrid[rowIdx - 1][colIdx].CellGroup !== cell.CellGroup)
-                            cell.Borders.AddBorder(CellBorders.Top);
-                        if (colIdx > 0 && this.CellsGrid[rowIdx][colIdx - 1].CellGroup !== cell.CellGroup)
-                            cell.Borders.AddBorder(CellBorders.Left);
-                    }
-                }
-            }
-
-            CanvasClick(clickEvent) {
-                const rect = this.Canvas.getBoundingClientRect();
-                const mouseX = clickEvent.clientX - rect.left - this.LeftX;
-                const mouseY = clickEvent.clientY - rect.top - this.TopY;
-
-                const cellX = Math.floor(mouseX / this.CellSize);
-                const cellY = Math.floor(mouseY / this.CellSize);
-
-                if (cellX < 0 || cellX >= this.ColCount
-                    || cellY < 0 || cellY >= this.RowCount)
-                    return;
-
-                this.SetMirror(cellY, cellX);
-
-                this.DrawGrid();
-            }
-
-            DrawGrid() {
-                this.CanvasContext.clearRect(0, 0, this.Canvas.width, this.Canvas.height);
-
-                this.DrawGridLines();
-                this.DrawCellGroupBorders();
-                this.DrawLaserLabels();
-                this.DrawMirrors();
-                this.DrawLasers();
-            }
-
-            //#region Grid Lines
-
-            DrawGridLines() {
-                this.SetGridLineStyle();
-
-                //horizontal lines
-                for (let y = 0; y <= this.RowCount; y++) {
-                    this.DrawGridLine(y, 0, y, this.ColCount);
-                }
-                //vertical lines
-                for (let x = 0; x <= this.ColCount; x++) {
-                    this.DrawGridLine(0, x, this.RowCount, x);
-                }
-            }
-
-            SetGridLineStyle() {
-                this.CanvasContext.setLineDash([]);
-                this.CanvasContext.strokeStyle = '#ddd'; //light gray
-                this.CanvasContext.lineWidth = 1; //1px thick
-            }
-
-            //#endregion
-
-            //#region Cell Groups
-
-            DrawCellGroupBorders() {
-                const groupHasValidMirror = new Set();
-                for (let i = 0; i <= this.CellGroups; i++) {
-                    const mirror = this.Mirrors.find(x => x.CellGroup === i);
-                    if (mirror && mirror.Valid)
-                        groupHasValidMirror.add(i);
-                }
-
-                for (const cell of this.CellsList) {
-                    const validGroup = groupHasValidMirror.has(cell.CellGroup);
-                    this.SetCellGroupBorderLineStyle(validGroup);
-
-                    if (cell.Borders.HasBorder(CellBorders.Left)) {
-                        this.DrawGridLine(cell.Row, cell.Col, cell.Row + 1, cell.Col);
-                    }
-                    if (cell.Borders.HasBorder(CellBorders.Top)) {
-                        this.DrawGridLine(cell.Row, cell.Col, cell.Row, cell.Col + 1);
-                    }
-                    if (cell.Borders.HasBorder(CellBorders.Right)) {
-                        this.DrawGridLine(cell.Row, cell.Col + 1, cell.Row + 1 , cell.Col + 1);
-                    }
-                    if (cell.Borders.HasBorder(CellBorders.Bottom)) {
-                        this.DrawGridLine(cell.Row + 1, cell.Col, cell.Row + 1, cell.Col + 1);
-                    }
-                }
-            }
-
-            SetCellGroupBorderLineStyle(valid = false) {
-                this.CanvasContext.strokeStyle = '#000'; //black
-                this.CanvasContext.setLineDash(valid ? [] : [20, 5]); //solid if valid, dashed if not
-                this.CanvasContext.lineWidth = 5; //5px thick
-            }
-
-            //#endregion
-
-            //#region Lasers
-
-            DrawLasers() {
-                for (const laser of this.Lasers) {
-                    //only need to draw the second one if the first doesn't get to the other endpoint
-                    if (!this.DrawLaser(laser.Endpoint1, laser.Endpoint2, laser.Mirrors))
-                        this.DrawLaser(laser.Endpoint2, laser.Endpoint1, laser.Mirrors);
-                }
-            }
-
-            /**
-            @param start {LaserEndpoint}
-            @param end {LaserEndpoint}
-            @param reqMirrors {number}
-            */
-            DrawLaser(start, end, reqMirrors) {
-                const segments = [];
-
-                let segmentStart = start;
-                /** @type {LaserEndpoint} */
-                let segmentEnd;
-                //always at least one segment
-                do {
-                    //segments after the first need to pass ignoreMirror = true because they are starting from a mirror
-                    segmentEnd = this.GetLaserSegmentEndpoint(segmentStart, segmentStart !== start);
-                    segments.push(new LaserSegment(segmentStart, segmentEnd));
-                    segmentStart = segmentEnd;
-                }
-                while (segmentEnd.Row >= 0 && segmentEnd.Row < this.RowCount && segmentEnd.Col >= 0 && segmentEnd.Col < this.ColCount);
-
-                //each mirror generates a new segment, so there must be reqMirrors + 1 segments (counting the original segment)
-                const valid = segmentEnd.Row === end.Row && segmentEnd.Col === end.Col && segments.length === reqMirrors + 1;
-
-                for (const segment of segments)
-                    this.DrawLaserSegment(segment.Endpoint1.Row, segment.Endpoint1.Col, segment.Endpoint2.Row, segment.Endpoint2.Col, valid);
-
-                return valid;
-            }
-
-            /** @param startPoint {LaserEndpoint} */
-            GetLaserSegmentEndpoint(startPoint, ignoreMirror = false) {
-                let row = startPoint.Row;
-                let col = startPoint.Col;
-                let direction = startPoint.Position;
-
-                const mirror = this.Mirrors.find(x => x.Row === startPoint.Row && x.Col === startPoint.Col);
-
-                //hitting a mirror keeps the row/col but changes direction
-                if (!ignoreMirror && mirror) {
-                    direction = this.GetDirectionAfterMirror(direction, mirror.Direction);
-                    return new LaserEndpoint(row, col, direction);
-                }
-                else {
-                    switch (direction) {
-                        case CellBorders.Left:
-                            col++;
-                            break;
-                        case CellBorders.Right:
-                            col--;
-                            break;
-                        case CellBorders.Top:
-                            row++;
-                            break;
-                        case CellBorders.Bottom:
-                            row--;
-                            break;
-                        default:
-                            throw "Invalid direction";
-                    }
-                }
-
-                //outside of the grid
-                if (row < 0 || row >= this.RowCount || col < 0 || col >= this.ColCount)
-                    return new LaserEndpoint(row, col, direction);                   
-
-                //continue segment
-                return this.GetLaserSegmentEndpoint(new LaserEndpoint(row, col, direction));
-            }
-
-            GetDirectionAfterMirror(startDirection, mirrorDirection) {
-                switch (startDirection) {
-                    case CellBorders.Left:
-                        return mirrorDirection === Mirror.TopLeftDownRight ? CellBorders.Top : CellBorders.Bottom;
-                    case CellBorders.Right:
-                        return mirrorDirection === Mirror.TopLeftDownRight ? CellBorders.Bottom : CellBorders.Top;
-                    case CellBorders.Top:
-                        return mirrorDirection === Mirror.TopLeftDownRight ? CellBorders.Left : CellBorders.Right;
-                    case CellBorders.Bottom:
-                        return mirrorDirection === Mirror.TopLeftDownRight ? CellBorders.Right : CellBorders.Left;
-                    default:
-                        throw "Invalid direction";
-                }
-            }
-
-            DrawLaserSegment(row1, col1, row2, col2, valid = false) {
-                this.SetLaserLineStyle(valid);
-
-                //draw lasers from the center of the cell
-                const midPos = this.CellSize / 2;
-                this.DrawGridLine(row1, col1, row2, col2, midPos);
-            }
-
-            SetLaserLineStyle(valid = false) {
-                this.CanvasContext.setLineDash([]);
-                this.CanvasContext.strokeStyle = valid ? '#0F0' : '#F00'; //green / red
-                this.CanvasContext.lineWidth = 3; //3px thick
-            }
-
-            //#endregion
-
-            //#region Labels
-
-            DrawLaserLabels() {
-                this.SetLabelTextStyle();
-
-                for (const laser of this.Lasers) {
-                    const labelText = laser.Name + laser.Mirrors;
-
-                    this.DrawLaserLabel(labelText, laser.Endpoint1);
-                    this.DrawLaserLabel(labelText, laser.Endpoint2);
-                }
-            }
-
-            /**
-            @param labelText {string}
-            @param laserEndpoint {LaserEndpoint}
-             */
-            DrawLaserLabel(labelText, laserEndpoint) {
-                this.DrawLabel(labelText, laserEndpoint.Row, laserEndpoint.Col, laserEndpoint.Position);
-            }
-
-            DrawLabel(text, row, col, position) {
-                //includes offsets for better positioning of text
-                let x = this.LeftX + (col * this.CellSize) + 8;
-                let y = this.TopY + ((row + 1) * this.CellSize) - 12;
-                this.CanvasContext.fillText(text, x, y);
-            }
-
-            SetLabelTextStyle() {
-                this.CanvasContext.fillStyle = '#000'; //black 
-                this.CanvasContext.font = '32px serif'; //font size and family
-            }
-
-            //#endregion
-
-            //#region Mirrors
-
-            SetMirror(row, col) {
-                const idx = this.Mirrors.findIndex(x => x.Row === row && x.Col === col);
-
-                if (idx >= 0) {
-                    const mirror = this.Mirrors[idx];
-
-                    //remove
-                    if (mirror.Direction === Mirror.TopRightDownLeft)
-                        this.Mirrors.splice(idx, 1);
-                    else
-                        mirror.Direction = Mirror.TopRightDownLeft;
-                }
-                else {
-                    const cell = this.CellsGrid[row][col];
-                    const mirror = new Mirror(row, col, cell.CellGroup, Mirror.TopLeftDownRight);
-                    this.Mirrors.push(mirror);
-                }
-
-                this.UpdateMirrorValidity();
-            }
-
-            UpdateMirrorValidity() {
-                const mirrorsByCellGroup = new Map();
-
-                for (const mirror of this.Mirrors) {
-                    if (!mirrorsByCellGroup.has(mirror.CellGroup))
-                        mirrorsByCellGroup.set(mirror.CellGroup, [mirror]);
-                    else
-                        mirrorsByCellGroup.get(mirror.CellGroup).push(mirror);
-                }
-
-                for (const cellGroup of mirrorsByCellGroup.keys()) {
-                    const mirrors = mirrorsByCellGroup.get(cellGroup);
-                    for (const mirror of mirrors)
-                        mirror.Valid = mirrors.length === 1;
-                }
-            }
-
-            DrawMirrors() {
-                for (const mirror of this.Mirrors) {
-                    this.DrawMirror(mirror);
-                }
-            }
-
-            /** @param mirror {Mirror} */
-            DrawMirror(mirror) {
-                this.SetMirrorLineStyle(mirror.Valid);
-
-                if (mirror.Direction === Mirror.TopLeftDownRight)
-                    this.DrawGridLine(mirror.Row, mirror.Col, mirror.Row + 1, mirror.Col + 1);
-                else
-                    this.DrawGridLine(mirror.Row, mirror.Col + 1, mirror.Row + 1, mirror.Col);
-            }
-
-            SetMirrorLineStyle(valid = true) {
-                this.CanvasContext.setLineDash([]);
-                this.CanvasContext.strokeStyle = valid ? '#00F' : '#F0F'; //blue / purple
-                this.CanvasContext.lineWidth = 3; //3px thick
-            }
-
-            //#endregion
-
-            //#region Helpers
-
-            DrawGridLine(row1, col1, row2, col2, offset = 0) {
-                const x1 = this.LeftX + (col1 * this.CellSize) + offset;
-                const y1 = this.TopY + (row1 * this.CellSize) + offset;
-                const x2 = this.LeftX + (col2 * this.CellSize) + offset;
-                const y2 = this.TopY + (row2 * this.CellSize) + offset;
-
-                this.DrawLine(x1, y1, x2, y2);
-            }
-
-            DrawLine(x1, y1, x2, y2) {
-                this.CanvasContext.beginPath();
-                this.CanvasContext.moveTo(x1, y1);
-                this.CanvasContext.lineTo(x2, y2);
-                this.CanvasContext.stroke();
-            }
-
-            //#endregion
-        }
-
-        class Cell {
-            Row = -1;
-            Col = -1;
-            CellGroup = -1;
-            Borders = new CellBorders();
-
-            constructor(row, col, cellGroup) {
-                this.Row = row;
-                this.Col = col;
-                this.CellGroup = cellGroup;
-            }
-        }
-
-        class CellBorders {
-            //if I had my Enum JS class I would use that here :(
-            static Left = 1 << 0;
-            static Right = 1 << 1;
-            static Top = 1 << 2;
-            static Bottom = 1 << 3;
-
-            #borders = 0;
-
-            AddBorder(border) {
-                this.#borders = this.#borders | border;
-            }
-
-            HasBorder(border) {
-                return (border & this.#borders) !== 0;
-            }
-        }
-
-        class LaserSegment {
-            /** @type {LaserEndpoint} */
-            Endpoint1;
-            /** @type {LaserEndpoint} */
-            Endpoint2;
-
-            constructor(endpoint1, endpoint2) {
-                this.Endpoint1 = endpoint1;
-                this.Endpoint2 = endpoint2;
-            }
-        }
-
-        class Laser extends LaserSegment {
-            Name = "";
-            Mirrors = 0;
-
-            constructor(name, mirrors, endpoint1, endpoint2) {
-                super(endpoint1, endpoint2);
-                this.Name = name;
-                this.Mirrors = mirrors;
-            }
-        }
-
-        class LaserEndpoint {
-            Row = -1;
-            Col = -1;
-            Position; //CellBorders enum value
-
-            constructor(row, col, position) {
-                this.Row = row;
-                this.Col = col;
-                this.Position = position;
-            }
-        }
-
-        class Mirror {
-            //also would ideally be an Enum
-            static TopLeftDownRight = false;
-            static TopRightDownLeft = true;
-
-            Row = -1;
-            Col = -1;
-            Direction = Mirror.TopLeftDownRight;
-            CellGroup = -1;
-            Valid = true;
-
-            constructor(row, col, cellGroup, direction = Mirror.TopLeftDownRight) {
-                this.Row = row;
-                this.Col = col;
-                this.CellGroup = cellGroup;
-                this.Direction = direction;
-            }
-        }
-
-        const cellGroups = [
-            [0, 0, 0, 1, 1, 1, 2],
-            [3, 3, 0, 1, 1, 2, 2],
-            [3, 3, 3, 3, 4, 2, 2],
-            [5, 6, 4, 4, 4, 7, 8],
-            [5, 6, 9, 9, 10, 7, 8],
-            [9, 9, 9, 11, 10, 10, 10],
-            [9, 9, 11, 11, 10, 10, 10]
-        ];
-
-        //note that laser endpoints are actually outside the grid proper
-        const lasers = [
-            new Laser("A", 3, new LaserEndpoint(-1, 5, CellBorders.Top), new LaserEndpoint(5, -1, CellBorders.Left)),
-            new Laser("B", 3, new LaserEndpoint(-1, 6, CellBorders.Top), new LaserEndpoint(6, -1, CellBorders.Left)),
-            new Laser("C", 3, new LaserEndpoint(2, 7, CellBorders.Right), new LaserEndpoint(7, 2, CellBorders.Bottom)),
-            new Laser("D", 2, new LaserEndpoint(0, 7, CellBorders.Right), new LaserEndpoint(2, -1, CellBorders.Left)),
-            new Laser("E", 2, new LaserEndpoint(-1, 2, CellBorders.Top), new LaserEndpoint(7, 6, CellBorders.Bottom)),
-            new Laser("F", 2, new LaserEndpoint(-1, 0, CellBorders.Top), new LaserEndpoint(-1, 4, CellBorders.Top)),
-        ];
-
-        const grid = new Grid('gridCanvas', 50, 50, cellGroups, lasers);
-
-        grid.DrawGrid();
+        puzzleCollection.ChangePuzzle('LaserMirrorGrid');
     </script>
 </body>
 </html>

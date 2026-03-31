@@ -9,7 +9,10 @@ class GridBase {
     #cellSize = 50;
     #cellList = [];
     #cellGrid = [];
-    #progressEvent = new EventManager("ProgressChanged");
+    /** @type {Map<string, ProgressTrack>} */
+    #progressTracks = new Map();
+    #successEvent = new EventManager('SuccessChanged');
+    #complete = false;
 
     //#endregion
 
@@ -46,8 +49,11 @@ class GridBase {
     get RowCount() { return this.CellGrid.length; }
     get ColCount() { return this.RowCount > 0 ? this.CellGrid[0].length : 0; }
 
-    get ProgressChanged() {
-        return this.#progressEvent;
+    get ProgressTracks() {
+        return this.#progressTracks;
+    }
+    get SuccessEvent() {
+        return this.#successEvent;
     }
 
     //#endregion
@@ -57,12 +63,14 @@ class GridBase {
         @param leftX {number}
         @param topY {number}
         @param gridRows {any[][]}
+        @param progressTracks {ProgressTrack[]}
     */
-    constructor(canvasId, leftX, topY, cellSize, gridRows) {
+    constructor(canvasId, leftX, topY, cellSize, gridRows, progressTracks) {
         this.#canvasId = canvasId;
         this.#cellSize = cellSize;
         this.#leftX = leftX;
         this.#topY = topY;
+        this.#progressTracks = new Map(Array.from(progressTracks, (v) => [v.Name, v]));
 
         this.LoadCells(gridRows);
         this.LoadGridBorders();
@@ -206,6 +214,48 @@ class GridBase {
 
     //#endregion
 
+    //#region Progress Tracking
+
+    SetProgress(name, value) {
+        const progressElement = this.#GetProgressElement(name);
+
+        const num = parseInt(value);
+        if (num === NaN)
+            throw "Invalid progress value: " + value;
+
+        progressElement.value = num;
+
+        this.#UpdateProgress();
+    }
+
+    #GetProgressElement(name) {
+        if (!this.#progressTracks.has(name))
+            throw "Invalid progress track: " + name;
+        const id = this.#progressTracks.get(name).ElementId;
+        /** @type {GridProgressElement} */
+        const progressElement = document.getElementById(id);
+        if (progressElement == null || !(progressElement instanceof GridProgressElement))
+            throw "Invalid progress track: " + name;
+        return progressElement;
+    }
+
+    #UpdateProgress() {
+        const incomplete = [...this.#progressTracks.keys()].some(name => {
+            const el = this.#GetProgressElement(name);
+            return el.value < el.max;
+        });
+        if (!incomplete && !this.#complete) {
+            this.#complete = true;
+            this.#successEvent.Call(true);
+        }
+        else if (incomplete && this.#complete) {
+            this.#complete = false;
+            this.#successEvent.Call(false);
+        }
+    }
+
+    //#endregion
+
     //#region Helpers
 
     ClearGrid() {
@@ -248,10 +298,6 @@ class GridBase {
         this.CanvasContext.font = '32px serif'; //font size and family
     }
 
-    SetProgress(name, value) {
-        this.#progressEvent.Call(new ProgressChangedEvent(name, value));
-    }
-
     //#endregion
 }
 
@@ -282,15 +328,5 @@ class CellBorders {
 
     HasBorder(border) {
         return (border & this.#borders) !== 0;
-    }
-}
-
-class ProgressChangedEvent {
-    Name;
-    Value;
-
-    constructor(name, value) {
-        this.Name = name;
-        this.Value = value;
     }
 }

@@ -141,18 +141,13 @@ class GridPuzzleCollection {
             progressElement.textContent = progressTrack.Display;
 
             progressContainer.append(progressElement);
-
             progressTrack.ElementId = elementId;
         }
 
         /** @type {GridBase} */
-        const grid = new puzzle.GridType.prototype.constructor(this.#canvasId, this.#leftX, this.#topY, puzzle.GridRows, ...puzzle.GridArgs);
+        const grid = puzzle.CreateGrid(this.#canvasId, this.#leftX, this.#topY);
 
-        grid.ProgressChanged.AddListener(puzzle, (/** @type {ProgressChangedEvent} */ e) => {
-            puzzle.SetProgress(e.Name, e.Value);
-        });
-
-        puzzle.SuccessEvent.AddListener(this, (e) => this.UpdateSuccess(e));
+        grid.SuccessEvent.AddListener(this, (e) => this.UpdateSuccess(e));
 
         this.#activePuzzle = id;
         this.#activeGrid = grid;

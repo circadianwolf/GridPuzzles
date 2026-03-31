@@ -1,4 +1,49 @@
 class LaserMirrorGrid extends GridBase {
+    static #puzzleInfo;
+
+    static #cellGroups = [
+        [0, 0, 0, 1, 1, 1, 2],
+        [3, 3, 0, 1, 1, 2, 2],
+        [3, 3, 3, 3, 4, 2, 2],
+        [5, 6, 4, 4, 4, 7, 8],
+        [5, 6, 9, 9, 10, 7, 8],
+        [9, 9, 9, 11, 10, 10, 10],
+        [9, 9, 11, 11, 10, 10, 10]
+    ];
+    //note that laser endpoints are actually outside the grid proper
+    static get #lasers() {
+        return [
+            new Laser("A", 3, new LaserEndpoint(-1, 5, CellBorders.Top), new LaserEndpoint(5, -1, CellBorders.Left)),
+            new Laser("B", 3, new LaserEndpoint(-1, 6, CellBorders.Top), new LaserEndpoint(6, -1, CellBorders.Left)),
+            new Laser("C", 3, new LaserEndpoint(2, 7, CellBorders.Right), new LaserEndpoint(7, 2, CellBorders.Bottom)),
+            new Laser("D", 2, new LaserEndpoint(0, 7, CellBorders.Right), new LaserEndpoint(2, -1, CellBorders.Left)),
+            new Laser("E", 2, new LaserEndpoint(-1, 2, CellBorders.Top), new LaserEndpoint(7, 6, CellBorders.Bottom)),
+            new Laser("F", 2, new LaserEndpoint(-1, 0, CellBorders.Top), new LaserEndpoint(-1, 4, CellBorders.Top)),
+        ];
+    }
+
+    static GetPuzzle() {
+        if (this.#puzzleInfo == null) {
+            const instructions = `Draw diagonal lines across certain squares to form mirrors, with exactly one mirror per region outlined in bold.
+The mirrors must be placed so that a laser fired horizontally or vertically into the grid from each lettered clue would then
+exit the grid at the same letter elsewhere, having bounced off the exact number of mirrors indicated by the number next to the letter.
+All mirrors must be reached by at least one laser.
+
+<br/><br/>Click a square to place a mirror.
+<br/>Click again to rotate the mirror.
+<br/>Clicking again will remove the mirror.`;
+
+            const progressTracks = [
+                new ProgressTrack(this.LaserProgress, 'Lasers', 6),
+                new ProgressTrack(this.MirrorProgress, 'Mirrors', 12)
+            ];
+
+            this.#puzzleInfo = new GridPuzzle('LaserMirrorGrid', 'Lasers', instructions, progressTracks, LaserMirrorGrid)
+        }
+
+        return this.#puzzleInfo;
+    }
+
     static get LaserProgress() {
         return "Lasers";
     }
@@ -13,48 +58,10 @@ class LaserMirrorGrid extends GridBase {
     /** @type {Mirror[]} */
     Mirrors = [];
 
-    static GetPuzzle() {
-        const instructions = `Draw diagonal lines across certain squares to form mirrors, with exactly one mirror per region outlined in bold.
-The mirrors must be placed so that a laser fired horizontally or vertically into the grid from each lettered clue would then
-exit the grid at the same letter elsewhere, having bounced off the exact number of mirrors indicated by the number next to the letter.
-All mirrors must be reached by at least one laser.
+    constructor(canvasId, leftX, topY) {
+        super(canvasId, leftX, topY, 50, LaserMirrorGrid.#cellGroups, LaserMirrorGrid.#puzzleInfo.ProgressTracks);
 
-<br/><br/>Click a square to place a mirror.
-<br/>Click again to rotate the mirror.
-<br/>Clicking again will remove the mirror.`;
-
-        const progressTracks = [
-            new ProgressTrack(this.LaserProgress, 'Lasers', 6),
-            new ProgressTrack(this.MirrorProgress, 'Mirrors', 12)
-        ];
-
-        const cellGroups = [
-            [0, 0, 0, 1, 1, 1, 2],
-            [3, 3, 0, 1, 1, 2, 2],
-            [3, 3, 3, 3, 4, 2, 2],
-            [5, 6, 4, 4, 4, 7, 8],
-            [5, 6, 9, 9, 10, 7, 8],
-            [9, 9, 9, 11, 10, 10, 10],
-            [9, 9, 11, 11, 10, 10, 10]
-        ];
-
-        //note that laser endpoints are actually outside the grid proper
-        const lasers = [
-            new Laser("A", 3, new LaserEndpoint(-1, 5, CellBorders.Top), new LaserEndpoint(5, -1, CellBorders.Left)),
-            new Laser("B", 3, new LaserEndpoint(-1, 6, CellBorders.Top), new LaserEndpoint(6, -1, CellBorders.Left)),
-            new Laser("C", 3, new LaserEndpoint(2, 7, CellBorders.Right), new LaserEndpoint(7, 2, CellBorders.Bottom)),
-            new Laser("D", 2, new LaserEndpoint(0, 7, CellBorders.Right), new LaserEndpoint(2, -1, CellBorders.Left)),
-            new Laser("E", 2, new LaserEndpoint(-1, 2, CellBorders.Top), new LaserEndpoint(7, 6, CellBorders.Bottom)),
-            new Laser("F", 2, new LaserEndpoint(-1, 0, CellBorders.Top), new LaserEndpoint(-1, 4, CellBorders.Top)),
-        ];
-
-        return new GridPuzzle('LaserMirrorGrid', 'Lasers', instructions, progressTracks, LaserMirrorGrid, cellGroups, [lasers]);
-    }
-
-    constructor(canvasId, leftX, topY, gridRows, lasers) {
-        super(canvasId, leftX, topY, 50, gridRows);
-
-        this.Lasers = lasers;
+        this.Lasers = LaserMirrorGrid.#lasers;
         //has to be done after the super() because this.CellGroups is not initialized until then
         this.LoadCellGroups();
     }

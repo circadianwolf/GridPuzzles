@@ -1,14 +1,20 @@
 class HitoriGrid extends GridBase {
-    static RowProgress = "Rows";
-    static ColProgress = "Columns";
-    static NoShadedTouchProgress = "NoShadedTouch";
-    static UnshadedRegionProgress = "UnshadedRegion";
+    static #puzzleInfo;
 
-    Rows = [];
-    Cols = [];
+    static #cells = [
+        [1, 2, 7, 8, 1, 6, 8, 5],
+        [6, 5, 8, 4, 2, 7, 2, 2],
+        [4, 6, 3, 6, 8, 6, 5, 7],
+        [5, 1, 8, 7, 4, 8, 4, 3],
+        [8, 4, 6, 2, 5, 6, 3, 1],
+        [5, 8, 1, 5, 2, 3, 2, 4],
+        [2, 3, 4, 8, 4, 6, 7, 1],
+        [5, 7, 8, 5, 2, 1, 6, 1]
+    ];
 
     static GetPuzzle() {
-        const instructions = `Shade some squares so that no number epeats in any row or column.
+        if (this.#puzzleInfo == null) {
+            const instructions = `Shade some squares so that no number epeats in any row or column.
 Shaded squares cannot touch, except diagonally.
 All unshaded squares must form a single connected region.
 
@@ -16,29 +22,29 @@ All unshaded squares must form a single connected region.
 <br/>Clicking again will shade it darker (identical function, visual only).
 <br/>Click again to remove shading.`;
 
-        const progressTracks = [
-            new ProgressTrack(this.RowProgress, 'Rows', 8),
-            new ProgressTrack(this.ColProgress, 'Columns', 8),
-            new ProgressTrack(this.NoShadedTouchProgress, 'No Shaded Squares Touch', 1),
-            new ProgressTrack(this.UnshadedRegionProgress, 'One Unshaded Region', 1)
-        ];
+            const progressTracks = [
+                new ProgressTrack(this.RowProgress, 'Rows', 8),
+                new ProgressTrack(this.ColProgress, 'Columns', 8),
+                new ProgressTrack(this.NoShadedTouchProgress, 'No Shaded Squares Touch', 1),
+                new ProgressTrack(this.UnshadedRegionProgress, 'One Unshaded Region', 1)
+            ];
 
-        const cells = [
-            [1, 2, 7, 8, 1, 6, 8, 5],
-            [6, 5, 8, 4, 2, 7, 2, 2],
-            [4, 6, 3, 6, 8, 6, 5, 7],
-            [5, 1, 8, 7, 4, 8, 4, 3],
-            [8, 4, 6, 2, 5, 6, 3, 1],
-            [5, 8, 1, 5, 2, 3, 2, 4],
-            [2, 3, 4, 8, 4, 6, 7, 1],
-            [5, 7, 8, 5, 2, 1, 6, 1]
-        ];
+            this.#puzzleInfo = new GridPuzzle('HitoriGrid', 'Hitori', instructions, progressTracks, HitoriGrid);
+        }
 
-        return new GridPuzzle('HitoriGrid', 'Hitori', instructions, progressTracks, HitoriGrid, cells);
+        return this.#puzzleInfo;
     }
 
-    constructor(canvasId, leftX, topY, gridRows) {
-        super(canvasId, leftX, topY, 44, gridRows);
+    static get RowProgress() { return "Rows"; }
+    static get ColProgress() { return "Columns"; }
+    static get NoShadedTouchProgress() { return "NoShadedTouch"; }
+    static get UnshadedRegionProgress() { return "UnshadedRegion"; }
+
+    Rows = [];
+    Cols = [];
+
+    constructor(canvasId, leftX, topY) {
+        super(canvasId, leftX, topY, 44, HitoriGrid.#cells, HitoriGrid.#puzzleInfo.ProgressTracks);
 
         for (let i = 0; i < this.RowCount; i++)
             this.Rows[i] = false;
@@ -68,14 +74,12 @@ All unshaded squares must form a single connected region.
         for (const row of this.CellGrid)
             colCells.push(row[cell.Col]);
         this.Cols[cell.Col] = this.#GetLineValidity(colCells);
-
-        
     }
 
     DrawGrid() {
         this.#UpdateProgress();
 
-        //we don't user super.DrawGrid() but instead call the functions directly because we want to draw the grid lines and cell borders after filling the cells in #DrawCells()
+        //we don't use super.DrawGrid() but instead call the functions directly because we want to draw the grid lines and cell borders after filling the cells in #DrawCells()
         this.ClearGrid();
         this.#DrawCells();
         this.DrawGridLines();
